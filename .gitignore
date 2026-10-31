@@ -1,17 +1,19 @@
-# Python virtual environments
+# Python environments and cache
 fl_env/
-env/
 venv/
-
-# Python compiled cache
 __pycache__/
 *.pyc
 
-# Downloaded dataset (do not push heavy data files)
+# Downloaded MNIST dataset and runtime logs
 data/
-
-# Generated runtime logs
 metrics.json
+
+# Xcode user data and build artifacts
+DerivedData/
+build/
+*.xcuserdata
+*.xcscmblueprint
+*.xccheckout
 
 # macOS system files
 .DS_Store
