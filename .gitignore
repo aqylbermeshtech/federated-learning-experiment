@@ -1,0 +1,17 @@
+# Python virtual environments
+fl_env/
+env/
+venv/
+
+# Python compiled cache
+__pycache__/
+*.pyc
+
+# Downloaded dataset (do not push heavy data files)
+data/
+
+# Generated runtime logs
+metrics.json
+
+# macOS system files
+.DS_Store
