@@ -12,7 +12,7 @@ METRICS_FILE = "metrics.json"
 auto_refresh = st.sidebar.checkbox("Auto-refresh live", value=True)
 
 if not os.path.exists(METRICS_FILE):
-    st.info("Waiting for training to start... Run server.py and your clients.")
+    st.info("Waiting for training to start... Run bridge_server.py or server.py.")
 else:
     try:
         with open(METRICS_FILE, "r") as f:
@@ -21,14 +21,16 @@ else:
         data = []
 
     if data:
-        df = pd.DataFrame(data).set_index("round")
-        latest = data[-1]
+        # Deduplicate rounds in case multiple runs wrote to the file, keeping latest
+        df = pd.DataFrame(data).drop_duplicates(subset=["round"], keep="last").set_index("round")
+        latest = df.iloc[-1]
+        latest_round = int(df.index[-1])
 
         # Top summary cards
         col1, col2, col3 = st.columns(3)
-        col1.metric("Current Round", f"{latest['round']} / 5")
-        col2.metric("Loss", f"{latest['loss']}")
-        col3.metric("Accuracy", f"{latest['accuracy']}%")
+        col1.metric("Current Round", f"{latest_round}")
+        col2.metric("Loss", f"{latest['loss']:.4f}")
+        col3.metric("Accuracy", f"{min(100.0, float(latest['accuracy'])):.2f}%")
 
         # Live training charts
         col_left, col_right = st.columns(2)

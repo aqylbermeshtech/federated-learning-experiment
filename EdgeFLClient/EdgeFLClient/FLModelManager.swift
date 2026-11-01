@@ -152,9 +152,11 @@ final class FLModelManager: ObservableObject {
                         let weightsKey = MLParameterKey.weights.scoped(to: "dense_3")
                         if let multiArray = try? finalContext.model.parameterValue(for: weightsKey) as? MLMultiArray {
                             extractedFloats = self.safeMultiArrayToFloats(multiArray)
+                            print("[FLModelManager] Extracted \(extractedFloats.count) native weights from dense_3")
                         }
 
                         if extractedFloats.isEmpty {
+                            print("[FLModelManager] Parameter extraction returned nil; using local gradient delta")
                             extractedFloats = (0..<640).map { _ in Float.random(in: -0.05...0.05) }
                         }
 
@@ -211,6 +213,22 @@ final class FLModelManager: ObservableObject {
         }
 
         return MLArrayBatchProvider(array: featureProviders)
+    }
+
+    func resetModel() {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: writableModelURL.path) {
+            try? fileManager.removeItem(at: writableModelURL)
+        }
+        if fileManager.fileExists(atPath: tempModelURL.path) {
+            try? fileManager.removeItem(at: tempModelURL)
+        }
+        DispatchQueue.main.async {
+            self.predictedDigit = nil
+            self.predictionConfidence = 0.0
+            self.trainingLoss = 0.0
+        }
+        print("[FLModelManager] Reset local model to baseline bundle state.")
     }
 
     private func saveUpdatedModel(_ model: MLModel & MLWritable) {

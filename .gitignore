@@ -11,7 +11,8 @@ metrics.json
 # Xcode user data and build artifacts
 DerivedData/
 build/
-*.xcuserdata
+xcuserdata/
+*.xcuserdata/
 *.xcscmblueprint
 *.xccheckout
 
