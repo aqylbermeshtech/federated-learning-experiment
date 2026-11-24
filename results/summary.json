@@ -1,0 +1,64 @@
+{
+  "experiment": "Non-IID MNIST Privacy-Utility Trade-off (FedAvg vs. DP-FedAvg)",
+  "seed": 42,
+  "num_rounds": 10,
+  "num_clients": 2,
+  "partition_scheme": "Extreme Non-IID (Client 1: digits 0-4, Client 2: digits 5-9)",
+  "device": "mps",
+  "model_parameters": 109386,
+  "client_payload_kb": 427.29,
+  "configurations": [
+    {
+      "config": "FedAvg (Baseline)",
+      "sigma": 0.0,
+      "clip_norm": 0.0,
+      "final_global_accuracy": 85.48,
+      "peak_global_accuracy": 87.93,
+      "final_global_loss": 0.4873,
+      "final_part_0_4_accuracy": 95.15,
+      "final_part_5_9_accuracy": 75.25,
+      "final_worst_partition_accuracy": 75.25,
+      "mean_round_latency_sec": 15.527,
+      "payload_kb": 427.29
+    },
+    {
+      "config": "DP-FedAvg (sigma=0.01)",
+      "sigma": 0.01,
+      "clip_norm": 1.0,
+      "final_global_accuracy": 77.74,
+      "peak_global_accuracy": 77.74,
+      "final_global_loss": 1.3819,
+      "final_part_0_4_accuracy": 94.45,
+      "final_part_5_9_accuracy": 60.07,
+      "final_worst_partition_accuracy": 60.07,
+      "mean_round_latency_sec": 15.229,
+      "payload_kb": 427.29
+    },
+    {
+      "config": "DP-FedAvg (sigma=0.05)",
+      "sigma": 0.05,
+      "clip_norm": 1.0,
+      "final_global_accuracy": 28.81,
+      "peak_global_accuracy": 33.05,
+      "final_global_loss": 1.9989,
+      "final_part_0_4_accuracy": 38.22,
+      "final_part_5_9_accuracy": 18.86,
+      "final_worst_partition_accuracy": 18.86,
+      "mean_round_latency_sec": 15.207,
+      "payload_kb": 427.29
+    },
+    {
+      "config": "DP-FedAvg (sigma=0.10)",
+      "sigma": 0.1,
+      "clip_norm": 1.0,
+      "final_global_accuracy": 14.84,
+      "peak_global_accuracy": 16.37,
+      "final_global_loss": 13.4373,
+      "final_part_0_4_accuracy": 14.89,
+      "final_part_5_9_accuracy": 14.79,
+      "final_worst_partition_accuracy": 14.79,
+      "mean_round_latency_sec": 15.208,
+      "payload_kb": 427.29
+    }
+  ]
+}

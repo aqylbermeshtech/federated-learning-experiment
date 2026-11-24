@@ -13,9 +13,14 @@ METRICS_FILE = "metrics.json"
 # set MIN_CLIENTS=2 in environment if running multi-client simulations.
 MIN_CLIENTS = int(os.environ.get("MIN_CLIENTS", 1))
 
+# Differential Privacy controls for live demo (default 0.0 = standard FedAvg)
+DP_SIGMA = float(os.environ.get("DP_SIGMA", 0.0))
+DP_CLIP_NORM = float(os.environ.get("DP_CLIP_NORM", 1.0))
+
 current_round = 1
 received_weights = []
 global_weights: List[float] = []
+
 
 class ClientPayload(BaseModel):
     client_id: str
@@ -23,22 +28,44 @@ class ClientPayload(BaseModel):
     num_samples: int
     weights: List[float]
 
-def compute_simulated_metrics(round_num: int):
-    """
-    Computes realistic federated learning convergence metrics bounded <= 100%
-    accuracy and decreasing loss.
-    """
-    # Accuracy asymptotically approaches ~92-94% from ~72%
-    base_acc = 72.0 + 20.0 * (1.0 - math.exp(-0.35 * round_num))
-    acc_noise = float(np.random.uniform(-0.4, 0.4))
-    accuracy = round(min(98.5, max(50.0, base_acc + acc_noise)), 2)
 
-    # Loss decreases monotonically from ~0.6 down towards ~0.18
-    base_loss = 0.18 + 0.5 * math.exp(-0.3 * round_num)
+def apply_dp_to_weights(weights_list: List[List[float]], sigma: float, clip_norm: float) -> List[np.ndarray]:
+    """
+    Applies L2 norm clipping and calibrated Gaussian noise to client weight updates
+    when DP_SIGMA > 0.0.
+    """
+    processed = []
+    for w in weights_list:
+        arr = np.asarray(w, dtype=np.float32)
+        if sigma > 0.0:
+            l2_norm = float(np.linalg.norm(arr))
+            scale = min(1.0, clip_norm / (l2_norm + 1e-12))
+            arr = arr * scale
+            noise = np.random.normal(0.0, sigma * clip_norm, size=arr.shape).astype(np.float32)
+            arr = arr + noise
+        processed.append(arr)
+    return processed
+
+
+def compute_simulated_metrics(round_num: int, sigma: float = 0.0):
+    """
+    Computes federated learning convergence metrics bounded <= 100%
+    accuracy and decreasing loss, accounting for DP noise utility penalty.
+    """
+    # Penalty grows with DP noise multiplier sigma
+    dp_acc_penalty = 140.0 * sigma if sigma <= 0.05 else (7.0 + 190.0 * (sigma - 0.05))
+    dp_loss_penalty = 2.8 * sigma
+
+    base_acc = (72.0 - dp_acc_penalty * 0.4) + (20.0 - dp_acc_penalty * 0.6) * (1.0 - math.exp(-0.35 * round_num))
+    acc_noise = float(np.random.uniform(-0.4, 0.4))
+    accuracy = round(min(98.5, max(10.0, base_acc + acc_noise)), 2)
+
+    base_loss = (0.18 + dp_loss_penalty) + 0.5 * math.exp(-0.3 * round_num)
     loss_noise = float(np.random.uniform(-0.015, 0.015))
     loss = round(max(0.10, base_loss + loss_noise), 4)
 
     return loss, accuracy
+
 
 @app.get("/status")
 def get_status():
@@ -46,15 +73,20 @@ def get_status():
         "current_round": current_round,
         "waiting_clients": len(received_weights),
         "required_clients": MIN_CLIENTS,
-        "has_global_weights": len(global_weights) > 0
+        "has_global_weights": len(global_weights) > 0,
+        "dp_sigma": DP_SIGMA,
+        "dp_clip_norm": DP_CLIP_NORM if DP_SIGMA > 0.0 else 0.0,
     }
+
 
 @app.get("/global_weights")
 def get_global_weights():
     return {
         "round": current_round,
-        "weights": global_weights
+        "weights": global_weights,
+        "dp_sigma": DP_SIGMA,
     }
+
 
 @app.post("/reset")
 def reset_experiment():
@@ -64,7 +96,8 @@ def reset_experiment():
     global_weights = []
     if os.path.exists(METRICS_FILE):
         os.remove(METRICS_FILE)
-    return {"status": "reset", "current_round": 1}
+    return {"status": "reset", "current_round": 1, "dp_sigma": DP_SIGMA}
+
 
 @app.post("/submit_weights")
 def submit_weights(payload: ClientPayload):
@@ -72,18 +105,21 @@ def submit_weights(payload: ClientPayload):
     print(f"--> Received {len(payload.weights)} weights from {payload.client_id} (Round {payload.round})")
     received_weights.append(payload.weights)
 
-    # When required clients report in, run FedAvg
+    # When required clients report in, run FedAvg (with optional DP clipping & noise)
     if len(received_weights) >= MIN_CLIENTS:
-        print(f"=== Aggregating Round {current_round} via FedAvg ({len(received_weights)} client(s)) ===")
-        averaged = np.mean(received_weights, axis=0).tolist()
+        mode_str = f"DP-FedAvg (sigma={DP_SIGMA}, C={DP_CLIP_NORM})" if DP_SIGMA > 0.0 else "FedAvg (Baseline)"
+        print(f"=== Aggregating Round {current_round} via {mode_str} ({len(received_weights)} client(s)) ===")
+        processed_weights = apply_dp_to_weights(received_weights, DP_SIGMA, DP_CLIP_NORM)
+        averaged = np.mean(processed_weights, axis=0).tolist()
         global_weights = averaged
         received_weights = []
 
-        loss, accuracy = compute_simulated_metrics(current_round)
+        loss, accuracy = compute_simulated_metrics(current_round, sigma=DP_SIGMA)
         record = {
             "round": current_round,
             "loss": loss,
-            "accuracy": accuracy
+            "accuracy": accuracy,
+            "dp_sigma": DP_SIGMA,
         }
 
         # Log to dashboard metrics
@@ -110,16 +146,19 @@ def submit_weights(payload: ClientPayload):
             "new_round": current_round,
             "loss": loss,
             "accuracy": accuracy,
-            "global_weights": global_weights
+            "dp_sigma": DP_SIGMA,
+            "global_weights": global_weights,
         }
 
     return {
         "status": "waiting_for_more_clients",
         "current_pool": len(received_weights),
-        "required_clients": MIN_CLIENTS
+        "required_clients": MIN_CLIENTS,
+        "dp_sigma": DP_SIGMA,
     }
+
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"Starting Edge FL Bridge Server (MIN_CLIENTS={MIN_CLIENTS})...")
+    print(f"Starting Edge FL Bridge Server (MIN_CLIENTS={MIN_CLIENTS}, DP_SIGMA={DP_SIGMA})...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
