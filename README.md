@@ -26,7 +26,7 @@ When edge clients hold **extreme Non-IID data** (e.g., Client 1 only observes di
   - **Client 2 Partition:** Digits `5, 6, 7, 8, 9` (29,404 training samples)
 - **Model Architecture:** 3-layer MLP (`784 -> 128 -> 64 -> 10` with ReLU activations), totaling **109,386 parameters** (**427.29 KB** float32 weight payload per client per round).
 - **Training Hyperparameters:** $N = 10$ federated communication rounds, 1 local epoch per round, batch size $32$, Adam optimizer ($\text{lr} = 0.002$), fixed random seed `seed = 42` across all configurations.
-- **Hardware & Runtime Environment:** Apple Silicon GPU (`mps` backend), PyTorch 2.8.0, Python 3.9 (`fl_env`).
+- **Hardware & Runtime Environment:** Apple Silicon GPU (`mps` backend), PyTorch 2.8.0, Python 3.9.
 
 ### 3. Empirical Results (10 Federated Rounds)
 
@@ -43,14 +43,21 @@ When edge clients hold **extreme Non-IID data** (e.g., Client 1 only observes di
 3. **System Overhead:** DP clipping and noise generation add negligible runtime latency (~15.2s per round across all runs) and zero communication overhead (**427.29 KB** per client update).
 
 ### 4. Reproducing the Benchmark & Figures
-Run the following commands to execute the 40-round benchmark from scratch and regenerate all CSV/JSON artifacts and 300 DPI plots in `results/`:
+
+#### Installation
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Run the following commands to execute the benchmark across all 4 configurations × 10 federated rounds (40 total rounds) from scratch and regenerate all CSV/JSON artifacts and 300 DPI plots in `results/`:
 
 ```bash
 # 1. Run the controlled Non-IID benchmark (saves results/benchmark_metrics.csv and results/summary.json)
-/Users/nurtore/fl_env/bin/python run_benchmark.py
+python run_benchmark.py
 
 # 2. Generate publication-ready figures (results/convergence_comparison.png and results/privacy_utility_tradeoff.png)
-/Users/nurtore/fl_env/bin/python plot_results.py
+python plot_results.py
 ```
 
 ---
@@ -59,25 +66,25 @@ Run the following commands to execute the 40-round benchmark from scratch and re
 
 ### 1. Start the Monitoring Dashboard
 ```bash
-/Users/nurtore/fl_env/bin/streamlit run dashboard.py
+streamlit run dashboard.py
 ```
 *(Switch between the **Live Federated Training Monitor** tab and the **Benchmark Comparison** tab in the UI).*
 
 ### 2. Run the FastAPI Weight Bridge
 ```bash
 # Standard FedAvg (default DP_SIGMA=0.0)
-/Users/nurtore/fl_env/bin/python bridge_server.py
+python bridge_server.py
 
 # Or enable live Differential Privacy noise during the demo (e.g. DP_SIGMA=0.01 or 0.05)
-DP_SIGMA=0.01 /Users/nurtore/fl_env/bin/python bridge_server.py
+DP_SIGMA=0.01 python bridge_server.py
 ```
-*(By default, `bridge_server.py` runs with `MIN_CLIENTS=1` for single-client dev testing. Run `MIN_CLIENTS=2 DP_SIGMA=0.01 /Users/nurtore/fl_env/bin/python bridge_server.py` to require multi-client consensus before DP-FedAvg aggregation).*
+*(By default, `bridge_server.py` runs with `MIN_CLIENTS=1` for single-client dev testing. Run `MIN_CLIENTS=2 DP_SIGMA=0.01 python bridge_server.py` to require multi-client consensus before DP-FedAvg aggregation).*
 
 ### 3. Run the iOS Edge Client
-Open `EdgeFLClient/EdgeFLClient.xcodeproj` in Xcode, run on an iOS Simulator or physical device. If testing on a physical iPhone on local Wi-Fi, tap **Device (`192.168.100.187`)** or enter your Mac's LAN IP into the Coordinator URL field, sketch a digit on the canvas, select its label, and tap **Train & Submit**.
+Open `EdgeFLClient/EdgeFLClient.xcodeproj` in Xcode, run on an iOS Simulator or physical device. If testing on a physical iPhone on local Wi-Fi, enter your Mac's LAN IP (e.g., `http://192.168.x.x:8000`) into the Coordinator URL field, sketch a digit on the canvas, select its label, and tap **Train & Submit**.
 
 ### 4. Optional: Run the Python Bridge Client
 To test multi-client federated training without needing a second physical device:
 ```bash
-/Users/nurtore/fl_env/bin/python bridge_client.py
+python bridge_client.py
 ```
